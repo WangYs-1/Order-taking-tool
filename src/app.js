@@ -12,6 +12,7 @@ let selectionMode = 'manual';
 let editorIngredients = [];
 let lastConfirmedMenu = null;
 let latestShareImage = null;
+let cookCategoryFilter = '';
 
 const app = document.querySelector('#app');
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -25,8 +26,17 @@ const toast = message => {
   clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 2600);
 };
 
-function navigate(next) { location.hash = next; }
-window.addEventListener('hashchange', () => { route = location.hash.slice(1) || 'home'; render(); scrollTo(0,0); });
+function navigate(next) {
+  if (next === 'cook' && route !== 'cook') cookCategoryFilter = '';
+  location.hash = next;
+}
+window.addEventListener('hashchange', () => {
+  const nextRoute = location.hash.slice(1) || 'home';
+  if (nextRoute === 'cook' && route !== 'cook') cookCategoryFilter = '';
+  route = nextRoute;
+  render();
+  scrollTo(0,0);
+});
 
 function shell(content) {
   const shopping = activeShopping();
@@ -65,11 +75,12 @@ function pageHead(title, actionLabel, action) {
 
 function cookPage() {
   const categories = [...new Set(state.dishes.map(x=>x.category))];
+  const visibleCategories = cookCategoryFilter ? categories.filter(c=>c===cookCategoryFilter) : categories;
   return `${pageHead('自己做','录入新菜','dish-form')}
     ${manualSelection.length ? `<section class="selection-bar"><div><strong>已选 ${manualSelection.length} 道菜</strong><p>${manualSelection.map(id=>state.dishes.find(x=>x.id===id)?.name).filter(Boolean).map(esc).join('、')}</p></div><button class="btn btn-primary" data-action="manual-confirm">去下单 ${icon('arrow',18)}</button></section>`:''}
     <section class="random-panel"><div><strong>随机盲盒点菜</strong><p>按荤素搭配，一键决定今天的菜单。</p></div><div class="random-controls">${categories.map(c=>`<label>${esc(c)} <select data-random-cat="${esc(c)}" aria-label="${esc(c)}数量">${[0,1,2,3,4].map(n=>`<option value="${n}" ${((c==='荤菜'&&n===2)||(c!=='荤菜'&&n===1))?'selected':''}>${n}</option>`).join('')}</select></label>`).join('')}<button class="btn btn-primary" data-action="random-dishes">${icon('dice',19)} 开盲盒</button></div></section>
-    <nav class="category-nav" aria-label="菜品分类">${categories.map((c,i)=>`<button class="chip ${i===0?'active':''}" data-anchor="cat-${i}">${esc(c)}</button>`).join('')}</nav>
-    ${categories.map((cat,i)=>`<section class="dish-section" id="cat-${i}"><h2>${esc(cat)} <span class="count">${state.dishes.filter(x=>x.category===cat).length} 道</span></h2><div class="card-grid">${state.dishes.filter(x=>x.category===cat).map(dishCard).join('')}</div></section>`).join('') || `<div class="empty">菜单还是空的，先录入一道拿手菜吧。</div>`}`;
+    <nav class="category-nav" aria-label="菜品分类"><button class="chip ${cookCategoryFilter===''?'active':''}" data-filter-cat="">全部</button>${categories.map(c=>`<button class="chip ${cookCategoryFilter===c?'active':''}" data-filter-cat="${esc(c)}">${esc(c)}</button>`).join('')}</nav>
+    ${visibleCategories.map(cat=>`<section class="dish-section" id="cat-${categories.indexOf(cat)}"><h2>${esc(cat)} <span class="count">${state.dishes.filter(x=>x.category===cat).length} 道</span></h2><div class="card-grid">${state.dishes.filter(x=>x.category===cat).map(dishCard).join('')}</div></section>`).join('') || `<div class="empty">菜单还是空的，先录入一道拿手菜吧。</div>`}`;
 }
 function dishCard(d) { const selected=manualSelection.includes(d.id); return `<article class="data-card"><h3>${esc(d.name)}</h3><p>${d.recipe ? (isUrl(d.recipe)?'外部菜谱链接':'家庭做法已记录') : '还没写菜谱'}</p><div class="tag-row">${d.ingredients.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><div class="card-actions"><button class="btn ${selected?'btn-dark':'btn-secondary'}" data-action="toggle-dish" data-id="${d.id}" aria-pressed="${selected}">${icon(selected?'check':'plus',16)} ${selected?'已选':'选这道'}</button><button class="btn btn-secondary" data-action="recipe" data-id="${d.id}">${icon('link',16)} 菜谱</button><button class="btn btn-secondary" data-action="dish-form" data-id="${d.id}" aria-label="编辑 ${esc(d.name)}">${icon('edit',16)}</button></div></article>`; }
 
@@ -413,6 +424,7 @@ function addIngredientName(name) {
 
 document.addEventListener('click', async e => {
   const nav = e.target.closest('[data-nav]'); if(nav) return navigate(nav.dataset.nav);
+  const filterCat = e.target.closest('[data-filter-cat]'); if(filterCat) { cookCategoryFilter = filterCat.dataset.filterCat || ''; render(); scrollTo(0,0); return; }
   const anchor = e.target.closest('[data-anchor]'); if(anchor) return document.querySelector(`#${anchor.dataset.anchor}`)?.scrollIntoView();
   const copy = e.target.closest('[data-copy]'); if(copy) { await navigator.clipboard.writeText(copy.dataset.copy); return toast('链接已复制，请前往对应 App 打开'); }
   const addMissing = e.target.closest('[data-add-missing]'); if(addMissing) { addMissing.dataset.addMissing.split('|').forEach(name=>{if(!state.shopping.some(x=>x.name===name&&!x.done)) state.shopping.push({id:uid('s'),name,done:false});}); persist(); closeModal(); render(); return toast('缺少食材已加入采购清单'); }
