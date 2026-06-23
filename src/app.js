@@ -16,6 +16,8 @@ let latestShareImage = null;
 const app = document.querySelector('#app');
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const isUrl = text => /^https?:\/\//i.test(text || '');
+const isWechatBrowser = () => /MicroMessenger/i.test(navigator.userAgent || '');
+const isIOSBrowser = () => /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 const activeShopping = () => state.shopping.filter(item => !item.done);
 const persist = () => { saveState(state); queueCloudSave(state); };
 const toast = message => {
@@ -327,7 +329,15 @@ async function shareImageCard(config, filename) {
   toast('正在生成分享图片');
   latestShareImage = { ...(await createShareImageData(config)), title: config.title, filename };
   closeModal();
-  modal('图片已生成', `<div class="image-preview"><div class="image-frame"><img src="${latestShareImage.dataUrl}" alt="${esc(config.title)}分享图片"></div><div class="share-help"><strong>手机分享建议</strong><p>优先点“转发/系统分享”。如果微信内置浏览器不弹出转发框，请长按图片保存后从微信发送。</p></div></div>`, `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 保存图片</button><button class="btn btn-primary" data-action="share-generated-image">${icon('share',17)} 转发/系统分享</button>`, true);
+  const wechat = isWechatBrowser();
+  const iosWechat = wechat && isIOSBrowser();
+  const help = wechat
+    ? `<strong>微信内推荐操作</strong><p>${iosWechat ? '不要从 iOS 分享菜单再点微信。' : ''}请长按上方图片，选择“发送给朋友”或“保存图片”后从聊天里发送。</p>`
+    : `<strong>手机分享建议</strong><p>优先点“转发/系统分享”。如果目标 App 不接收图片，请长按图片保存后手动发送。</p>`;
+  const footer = wechat
+    ? `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 尝试保存图片</button><button class="btn btn-primary" data-action="zoom-share-image">${icon('share',17)} 放大图片长按</button>`
+    : `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 保存图片</button><button class="btn btn-primary" data-action="share-generated-image">${icon('share',17)} 转发/系统分享</button>`;
+  modal('图片已生成', `<div class="image-preview ${wechat ? 'wechat-share-preview' : ''}"><div class="image-frame"><img src="${latestShareImage.dataUrl}" alt="${esc(config.title)}分享图片"></div><div class="share-help">${help}</div></div>`, footer, true);
 }
 async function shareMenuImage() {
   const menu = lastConfirmedMenu || { dishes: randomSelection, ingredients:[...new Set(randomSelection.flatMap(x=>x.ingredients))], note:'无特殊备注' };
@@ -364,6 +374,7 @@ async function shareText(title, text) {
 }
 async function shareGeneratedImage() {
   if(!latestShareImage?.blob) return toast('请先生成图片');
+  if(isWechatBrowser()) return toast('微信内请长按图片选择发送给朋友或保存图片');
   const file = new File([latestShareImage.blob], latestShareImage.filename || '今天吃点啥.png', { type: 'image/png' });
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try {
@@ -382,6 +393,11 @@ async function shareGeneratedImage() {
     }
   }
   toast('当前浏览器不支持直接分享图片，请长按图片保存后转发微信');
+}
+function zoomShareImage() {
+  if(!latestShareImage?.dataUrl) return toast('请先生成图片');
+  closeModal();
+  modal('长按图片发送', `<div class="image-preview image-preview-large"><div class="share-help"><strong>${isWechatBrowser() ? '微信内操作' : '保存图片'}</strong><p>${isWechatBrowser() ? '长按下方大图，选择“发送给朋友”或“保存图片”。如果没有发送入口，请先保存到相册，再到聊天里选择图片发送。' : '长按下方图片保存，或返回上一层使用系统分享。'}</p></div><img src="${latestShareImage.dataUrl}" alt="${esc(latestShareImage.title || '今天吃点啥')}分享图片"></div>`, `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 尝试保存图片</button><button class="btn btn-primary" data-action="close-modal">知道了</button>`, true);
 }
 function downloadShareImage() {
   if(!latestShareImage?.dataUrl) return toast('请先生成图片');
@@ -424,6 +440,7 @@ document.addEventListener('click', async e => {
   if(action==='confirm-menu') confirmMenu();
   if(action==='share-menu-image') shareMenuImage();
   if(action==='share-generated-image') shareGeneratedImage();
+  if(action==='zoom-share-image') zoomShareImage();
   if(action==='download-share-image') downloadShareImage();
   if(action==='random-place') {
     const cat=document.querySelector('#place-category').value, rating=+document.querySelector('#place-rating').value;
