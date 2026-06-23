@@ -184,67 +184,164 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
 }
-async function createShareImageData({ eyebrow, title, sections }) {
+function ellipsizeCanvasText(ctx, text, maxWidth) {
+  const value = String(text || '');
+  if (ctx.measureText(value).width <= maxWidth) return value;
+  let low = 0, high = value.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (ctx.measureText(`${value.slice(0, mid)}…`).width <= maxWidth) low = mid;
+    else high = mid - 1;
+  }
+  return `${value.slice(0, low)}…`;
+}
+function visibleItems(items = [], limit = 8, empty = '暂无') {
+  const list = items.filter(Boolean).map(String);
+  if (!list.length) return [empty];
+  if (list.length <= limit) return list;
+  return [...list.slice(0, Math.max(1, limit - 1)), `还有 ${list.length - limit + 1} 项`];
+}
+function drawSoftCircle(ctx, x, y, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+function drawSectionTitle(ctx, title, x, y, w, color) {
+  ctx.fillStyle = color;
+  roundRect(ctx, x, y, w, 48, 20);
+  ctx.fill();
+  ctx.fillStyle = '#2d2926';
+  ctx.font = '900 25px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  ctx.fillText(ellipsizeCanvasText(ctx, title, w - 36), x + 18, y + 32);
+}
+function drawListItems(ctx, items, x, y, w, limit = 5, empty) {
+  const rows = visibleItems(items, limit, empty);
+  ctx.font = '24px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  rows.forEach((item, index) => {
+    const rowY = y + index * 54;
+    ctx.fillStyle = '#fffdfa';
+    roundRect(ctx, x, rowY, w, 44, 16);
+    ctx.fill();
+    ctx.fillStyle = item.startsWith('还有 ') ? '#8cc7aa' : '#ef6a4c';
+    ctx.beginPath();
+    ctx.arc(x + 24, rowY + 22, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2d2926';
+    ctx.fillText(ellipsizeCanvasText(ctx, item, w - 58), x + 44, rowY + 30);
+  });
+  return y + rows.length * 54;
+}
+function drawChipItems(ctx, items, x, y, w, limit = 8, empty, color = '#fff3c8') {
+  const chips = visibleItems(items, limit, empty);
+  const gap = 14;
+  const colW = (w - gap) / 2;
+  ctx.font = '700 22px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  chips.forEach((item, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const chipX = x + col * (colW + gap);
+    const chipY = y + row * 52;
+    ctx.fillStyle = item.startsWith('还有 ') ? '#eaf7ef' : color;
+    roundRect(ctx, chipX, chipY, colW, 40, 18);
+    ctx.fill();
+    ctx.fillStyle = item.startsWith('还有 ') ? '#397958' : '#5c4211';
+    ctx.fillText(ellipsizeCanvasText(ctx, item, colW - 28), chipX + 14, chipY + 27);
+  });
+  return y + Math.ceil(chips.length / 2) * 52;
+}
+function drawNoteItem(ctx, text, x, y, w) {
+  ctx.fillStyle = '#fffdfa';
+  roundRect(ctx, x, y, w, 88, 18);
+  ctx.fill();
+  ctx.fillStyle = '#6b625a';
+  ctx.font = '22px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  wrapCanvasText(ctx, text || '无特殊备注', w - 36).slice(0, 2).forEach((line, index) => {
+    ctx.fillText(ellipsizeCanvasText(ctx, line, w - 36), x + 18, y + 34 + index * 30);
+  });
+  return y + 104;
+}
+async function createShareImageData({ eyebrow, title, subtitle = '把今晚吃什么，一张图发给家人。', sections }) {
   const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
-  const width = 900, pad = 58, max = width - pad * 2;
-  ctx.font = '26px "Microsoft YaHei UI", "PingFang SC", sans-serif';
-  let height = 260;
-  sections.forEach(section => {
-    height += 64;
-    section.items.forEach(item => height += Math.max(44, wrapCanvasText(ctx, item, max - 28).length * 34 + 12));
-  });
-  height += 76;
+  const width = 900, height = 1280, pad = 70, max = width - pad * 2;
   canvas.width = width; canvas.height = height;
-  ctx.fillStyle = '#fff9ef'; ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = '#ffe7dc'; roundRect(ctx, 28, 28, width-56, height-56, 36); ctx.fill();
-  ctx.fillStyle = '#fffefb'; roundRect(ctx, 48, 48, width-96, height-96, 30); ctx.fill();
-  ctx.strokeStyle = '#2d2926'; ctx.lineWidth = 4; ctx.stroke();
-  ctx.fillStyle = '#ef6a4c'; roundRect(ctx, pad, 72, 250, 38, 19); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '700 20px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText(eyebrow, pad + 18, 98);
-  ctx.fillStyle = '#2d2926'; ctx.font = '900 54px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText(title, pad, 166);
-  ctx.fillStyle = '#716a63'; ctx.font = '24px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText('把今晚吃什么，一张图发给家人。', pad, 210);
-  let y = 276;
+
+  ctx.fillStyle = '#fff5e8'; ctx.fillRect(0, 0, width, height);
+  drawSoftCircle(ctx, 124, 120, 86, '#ffe1d4');
+  drawSoftCircle(ctx, 802, 188, 118, '#fff0be');
+  drawSoftCircle(ctx, 790, 1050, 160, '#ddf3e7');
+  drawSoftCircle(ctx, 112, 1120, 96, '#ffe5d9');
+
+  ctx.shadowColor = 'rgba(45,41,38,.14)';
+  ctx.shadowBlur = 34;
+  ctx.shadowOffsetY = 18;
+  ctx.fillStyle = '#fffefb';
+  roundRect(ctx, 44, 44, width - 88, height - 88, 42);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = '#2d2926';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ef6a4c';
+  roundRect(ctx, pad, 82, 236, 42, 21);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '800 21px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  ctx.fillText(ellipsizeCanvasText(ctx, eyebrow, 192), pad + 20, 110);
+
+  ctx.fillStyle = '#2d2926';
+  ctx.font = '900 56px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  const titleLines = wrapCanvasText(ctx, title, max).slice(0, 2);
+  titleLines.forEach((line, index) => ctx.fillText(ellipsizeCanvasText(ctx, line, max), pad, 182 + index * 62));
+  const subtitleY = titleLines.length > 1 ? 292 : 228;
+  ctx.fillStyle = '#716a63';
+  ctx.font = '25px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  ctx.fillText(ellipsizeCanvasText(ctx, subtitle, max), pad, subtitleY);
+
+  let y = subtitleY + 58;
   sections.forEach((section, sectionIndex) => {
-    ctx.fillStyle = sectionIndex % 2 ? '#eaf7ef' : '#fff3c8';
-    roundRect(ctx, pad, y - 38, max, 46, 18); ctx.fill();
-    ctx.fillStyle = '#2d2926'; ctx.font = '900 26px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText(section.title, pad + 18, y - 8);
-    y += 26;
-    ctx.font = '24px "Microsoft YaHei UI", "PingFang SC", sans-serif';
-    section.items.forEach(item => {
-      const lines = wrapCanvasText(ctx, item, max - 44);
-      const boxH = Math.max(46, lines.length * 34 + 14);
-      ctx.fillStyle = '#ffffff'; roundRect(ctx, pad, y, max, boxH, 18); ctx.fill();
-      ctx.fillStyle = '#ef6a4c'; ctx.beginPath(); ctx.arc(pad + 24, y + 24, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#2d2926';
-      lines.forEach((line, i) => ctx.fillText(line, pad + 44, y + 32 + i * 34));
-      y += boxH + 12;
-    });
-    y += 18;
+    if (y > height - 190) return;
+    const color = section.color || (sectionIndex % 2 ? '#eaf7ef' : '#fff3c8');
+    drawSectionTitle(ctx, section.title, pad, y, max, color);
+    y += 66;
+    if (section.style === 'chips') y = drawChipItems(ctx, section.items, pad, y, max, section.limit, section.empty, color);
+    else if (section.style === 'note') y = drawNoteItem(ctx, section.items?.[0], pad, y, max);
+    else y = drawListItems(ctx, section.items, pad, y, max, section.limit, section.empty);
+    y += 20;
   });
-  ctx.fillStyle = '#716a63'; ctx.font = '20px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText('今天吃点啥 · 家庭菜单助手', pad, height - 58);
+
+  ctx.strokeStyle = '#f0ded0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pad, height - 100);
+  ctx.lineTo(width - pad, height - 100);
+  ctx.stroke();
+  ctx.fillStyle = '#716a63';
+  ctx.font = '20px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  ctx.fillText('长按保存后可转发到微信 · 今天吃点啥', pad, height - 62);
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', .96));
   return { blob, dataUrl: canvas.toDataURL('image/png') };
 }
 async function shareImageCard(config, filename) {
-  latestShareImage = await createShareImageData(config);
-  const file = new File([latestShareImage.blob], filename, { type: 'image/png' });
-  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-    try { await navigator.share({ title: config.title, files: [file] }); toast('图片已调起系统分享'); return; }
-    catch(e) { if (e.name === 'AbortError') return; }
-  }
+  toast('正在生成分享图片');
+  latestShareImage = { ...(await createShareImageData(config)), title: config.title, filename };
   closeModal();
-  modal('图片已生成', `<div class="image-preview"><img src="${latestShareImage.dataUrl}" alt="${esc(config.title)}分享图片"><p class="hint">长按或下载图片后，可直接转发到微信。</p></div>`, `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 下载图片</button><button class="btn btn-primary" data-action="close-modal">完成</button>`, true);
+  modal('图片已生成', `<div class="image-preview"><div class="image-frame"><img src="${latestShareImage.dataUrl}" alt="${esc(config.title)}分享图片"></div><div class="share-help"><strong>手机分享建议</strong><p>优先点“转发/系统分享”。如果微信内置浏览器不弹出转发框，请长按图片保存后从微信发送。</p></div></div>`, `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 保存图片</button><button class="btn btn-primary" data-action="share-generated-image">${icon('share',17)} 转发/系统分享</button>`, true);
 }
 async function shareMenuImage() {
   const menu = lastConfirmedMenu || { dishes: randomSelection, ingredients:[...new Set(randomSelection.flatMap(x=>x.ingredients))], note:'无特殊备注' };
   const stock = new Set(state.inventory.map(x=>x.name));
+  const ready = menu.ingredients.filter(x=>stock.has(x));
+  const missing = menu.ingredients.filter(x=>!stock.has(x));
   await shareImageCard({
     eyebrow: '今天吃点啥',
     title: '今晚开饭啦',
     sections: [
-      { title: '菜单', items: menu.dishes.map(x=>`${x.name} · ${x.category}`) },
-      { title: '食材清单', items: menu.ingredients.map(x=>`${x} — ${stock.has(x)?'冰箱有':'需要采购'}`) },
-      { title: '备注', items: [menu.note || '无特殊备注'] }
+      { title: `菜单 · ${menu.dishes.length} 道`, items: menu.dishes.map(x=>`${x.name} · ${x.category}`), limit: 4, color: '#fff0bd' },
+      { title: `需要采购 · ${missing.length} 项`, items: missing, style: 'chips', limit: 8, empty: '冰箱都够用', color: '#ffe3d8' },
+      { title: `冰箱已有 · ${ready.length} 项`, items: ready, style: 'chips', limit: 4, empty: '暂无匹配', color: '#e2f5e9' },
+      { title: '备注', items: [menu.note || '无特殊备注'], style: 'note', color: '#f1edff' }
     ]
   }, '今晚菜单.png');
 }
@@ -253,10 +350,11 @@ async function sharePlaceImage(p) {
   await shareImageCard({
     eyebrow: p.type === 'takeout' ? '外卖推荐' : '餐馆推荐',
     title: p.name,
+    subtitle: '这家今天可以安排。',
     sections: [
-      { title: '分类与评分', items: [`${p.category} · ${Number(p.rating).toFixed(1)} 星`] },
-      { title: p.type === 'takeout' ? '配送信息' : '地址', items: [p.address] },
-      { title: '招牌', items: [p.specials || '待补充'] }
+      { title: '分类与评分', items: [`${p.category} · ${Number(p.rating).toFixed(1)} 星`], limit: 1, color: '#fff0bd' },
+      { title: p.type === 'takeout' ? '配送信息' : '地址', items: [p.address], limit: 2, color: '#e2f5e9' },
+      { title: '招牌', items: [p.specials || '待补充'], style: 'note', color: '#ffe3d8' }
     ]
   }, `${p.name}.png`);
 }
@@ -264,11 +362,32 @@ async function shareText(title, text) {
   if(navigator.share) { try { await navigator.share({title,text}); return; } catch(e) { if(e.name==='AbortError') return; } }
   await navigator.clipboard.writeText(text); toast('内容已复制，可粘贴到微信');
 }
+async function shareGeneratedImage() {
+  if(!latestShareImage?.blob) return toast('请先生成图片');
+  const file = new File([latestShareImage.blob], latestShareImage.filename || '今天吃点啥.png', { type: 'image/png' });
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ title: latestShareImage.title || '今天吃点啥', files: [file] });
+      return toast('已调起系统分享');
+    } catch(e) {
+      if(e.name === 'AbortError') return;
+    }
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: latestShareImage.title || '今天吃点啥', text: '分享图片已生成，请长按保存后转发到微信。' });
+      return;
+    } catch(e) {
+      if(e.name === 'AbortError') return;
+    }
+  }
+  toast('当前浏览器不支持直接分享图片，请长按图片保存后转发微信');
+}
 function downloadShareImage() {
   if(!latestShareImage?.dataUrl) return toast('请先生成图片');
   const a = document.createElement('a');
   a.href = latestShareImage.dataUrl;
-  a.download = '今天吃点啥.png';
+  a.download = latestShareImage.filename || '今天吃点啥.png';
   a.click();
 }
 function addIngredientName(name) {
@@ -304,6 +423,7 @@ document.addEventListener('click', async e => {
   if(action==='random-dishes-again') { closeModal(); pickDishes(); }
   if(action==='confirm-menu') confirmMenu();
   if(action==='share-menu-image') shareMenuImage();
+  if(action==='share-generated-image') shareGeneratedImage();
   if(action==='download-share-image') downloadShareImage();
   if(action==='random-place') {
     const cat=document.querySelector('#place-category').value, rating=+document.querySelector('#place-rating').value;
