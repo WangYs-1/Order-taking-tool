@@ -52,7 +52,7 @@ function shell(content) {
 
 function bottomNav() {
   return `<nav class="bottom-nav" aria-label="主要导航">
-    ${[['cook','chef','自己做'],['out','store','出去吃'],['takeout','bike','点外卖'],['fridge','fridge','冰箱']].map(([r,i,t])=>`<button class="${route===r?'active':''}" data-nav="${r}" aria-label="${t}">${icon(i,21)}<span>${t}</span></button>`).join('')}
+    ${[['cook','chef','自己做'],['out','store','出去吃'],['takeout','bike','点外卖'],['fridge','fridge','冰箱']].map(([r,i,t])=>`<button class="${route===r || (route==='terms'&&r==='fridge')?'active':''}" data-nav="${r}" aria-label="${t}">${icon(i,21)}<span>${t}</span></button>`).join('')}
   </nav>`;
 }
 
@@ -104,16 +104,22 @@ function placeCard(p) { return `<article class="data-card"><div class="stars">${
 
 function fridgePage() {
   const selectedClass = cleanupMode ? '' : 'hidden';
-  const terms = state.terms.filter(Boolean).slice().sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'));
+  const termCount = state.terms.filter(Boolean).length;
   return `${pageHead('冰箱库存')}
   <section class="inventory-summary"><div><strong>冰箱里有 ${state.inventory.length} 样食材</strong><p>${activeShopping().length ? `还有 ${activeShopping().length} 样东西待采购。`:'采购清单已经清空。'}</p></div><div class="toolbar">${cleanupMode?`<button class="btn btn-danger" data-action="delete-stock">${icon('trash',18)} 删除所选</button><button class="btn btn-secondary" data-action="cleanup-cancel">取消</button>`:`<button class="btn btn-secondary" data-action="cleanup">${icon('trash',18)} 清理冰箱</button>`}</div></section>
   <div class="inventory-grid"><section class="panel"><div class="section-head"><div><h2>现有存货</h2><p>按到期时间优先安排</p></div><button class="icon-btn" data-action="inventory-form" aria-label="录入食材">${icon('plus')}</button></div><div class="inventory-list">${state.inventory.sort((a,b)=>(a.expiry||'9').localeCompare(b.expiry||'9')).map(x=>`<article class="inventory-item">${cleanupMode?`<input type="checkbox" data-stock-select value="${x.id}" aria-label="选择 ${esc(x.name)}">`:''}<span class="food-dot">${esc(x.name.slice(0,1))}</span><span class="inventory-meta"><strong>${esc(x.name)} · ${esc(x.amount)}</strong><small>入库：${esc(x.added||'/')}</small><small>到期：${esc(x.expiry||'/')}</small></span><button class="icon-btn" data-action="inventory-form" data-id="${x.id}" aria-label="编辑 ${esc(x.name)}">${icon('edit',17)}</button></article>`).join('') || `<div class="empty">冰箱空空的。</div>`}</div></section>
   <section class="panel"><div class="section-head"><div><h2>待补充清单</h2><p>同步显示在首页提醒</p></div><button class="icon-btn" data-action="shopping-form" aria-label="添加待采购食材">${icon('plus')}</button></div><div class="inventory-list">${state.shopping.map(x=>`<article class="inventory-item shopping-item ${x.done?'done':''}"><button class="icon-btn" data-action="toggle-shopping" data-id="${x.id}" aria-label="${x.done?'恢复':'标记已采购'} ${esc(x.name)}">${icon(x.done?'check':'cart',18)}</button><span class="inventory-meta"><strong>${esc(x.name)}</strong><small>${x.done?'已采购':'等待采购'}</small></span><button class="icon-btn" data-action="delete-shopping" data-id="${x.id}" aria-label="删除 ${esc(x.name)}">${icon('trash',17)}</button></article>`).join('') || `<div class="empty">没有待采购食材。</div>`}</div></section></div>
-  <section class="panel terms-panel"><div class="section-head"><div><h2>食材词条管理</h2><p>删除不会影响已保存的菜品、库存和采购清单，只会从下拉候选里移除。</p></div><span class="count">${terms.length} 条</span></div><div class="term-edit-list">${terms.map(name=>`<span class="term-edit-chip">${esc(name)}<button type="button" data-action="delete-term" data-name="${esc(name)}" aria-label="删除词条 ${esc(name)}">${icon('close',13)}</button></span>`).join('') || `<div class="empty">还没有食材词条。</div>`}</div></section><datalist id="terms">${state.terms.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
+  <section class="panel terms-entry"><div><h2>食材词条管理</h2><p>管理下拉候选词条，清理不再使用的食材名称。</p></div><div class="terms-entry-actions"><span class="count">${termCount} 条</span><button class="btn btn-secondary" data-nav="terms">${icon('edit',17)} 去管理</button></div></section><datalist id="terms">${state.terms.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
+}
+
+function termsPage() {
+  const terms = state.terms.filter(Boolean).slice().sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'));
+  return `<div class="page-head"><div class="page-title"><button class="back-btn" data-nav="fridge" aria-label="返回冰箱">${icon('back')}</button><h1>食材词条管理</h1></div></div>
+  <section class="panel terms-panel"><div class="section-head"><div><h2>下拉候选词条</h2><p>删除不会影响已保存的菜品、库存和采购清单，只会从新增/选择食材的下拉候选里移除。</p></div><span class="count">${terms.length} 条</span></div><div class="term-edit-list">${terms.map(name=>`<span class="term-edit-chip">${esc(name)}<button type="button" data-action="delete-term" data-name="${esc(name)}" aria-label="删除词条 ${esc(name)}">${icon('close',13)}</button></span>`).join('') || `<div class="empty">还没有食材词条。</div>`}</div></section>`;
 }
 
 function render() {
-  const pages = {home:homePage,cook:cookPage,out:()=>placesPage('out'),takeout:()=>placesPage('takeout'),fridge:fridgePage};
+  const pages = {home:homePage,cook:cookPage,out:()=>placesPage('out'),takeout:()=>placesPage('takeout'),fridge:fridgePage,terms:termsPage};
   app.innerHTML = shell((pages[route] || homePage)());
 }
 
