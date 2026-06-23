@@ -10,6 +10,8 @@ let randomSelection = [];
 let manualSelection = [];
 let selectionMode = 'manual';
 let editorIngredients = [];
+let lastConfirmedMenu = null;
+let latestShareImage = null;
 
 const app = document.querySelector('#app');
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -67,7 +69,7 @@ function cookPage() {
     <nav class="category-nav" aria-label="菜品分类">${categories.map((c,i)=>`<button class="chip ${i===0?'active':''}" data-anchor="cat-${i}">${esc(c)}</button>`).join('')}</nav>
     ${categories.map((cat,i)=>`<section class="dish-section" id="cat-${i}"><h2>${esc(cat)} <span class="count">${state.dishes.filter(x=>x.category===cat).length} 道</span></h2><div class="card-grid">${state.dishes.filter(x=>x.category===cat).map(dishCard).join('')}</div></section>`).join('') || `<div class="empty">菜单还是空的，先录入一道拿手菜吧。</div>`}`;
 }
-function dishCard(d) { const selected=manualSelection.includes(d.id); return `<article class="data-card"><h3>${esc(d.name)}</h3><p>${isUrl(d.recipe)?'外部菜谱链接':'家庭做法已记录'}</p><div class="tag-row">${d.ingredients.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><div class="card-actions"><button class="btn ${selected?'btn-dark':'btn-secondary'}" data-action="toggle-dish" data-id="${d.id}" aria-pressed="${selected}">${icon(selected?'check':'plus',16)} ${selected?'已选':'选这道'}</button><button class="btn btn-secondary" data-action="recipe" data-id="${d.id}">${icon('link',16)} 菜谱</button><button class="btn btn-secondary" data-action="dish-form" data-id="${d.id}" aria-label="编辑 ${esc(d.name)}">${icon('edit',16)}</button></div></article>`; }
+function dishCard(d) { const selected=manualSelection.includes(d.id); return `<article class="data-card"><h3>${esc(d.name)}</h3><p>${d.recipe ? (isUrl(d.recipe)?'外部菜谱链接':'家庭做法已记录') : '还没写菜谱'}</p><div class="tag-row">${d.ingredients.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><div class="card-actions"><button class="btn ${selected?'btn-dark':'btn-secondary'}" data-action="toggle-dish" data-id="${d.id}" aria-pressed="${selected}">${icon(selected?'check':'plus',16)} ${selected?'已选':'选这道'}</button><button class="btn btn-secondary" data-action="recipe" data-id="${d.id}">${icon('link',16)} 菜谱</button><button class="btn btn-secondary" data-action="dish-form" data-id="${d.id}" aria-label="编辑 ${esc(d.name)}">${icon('edit',16)}</button></div></article>`; }
 
 function placesPage(type) {
   const isTakeout = type === 'takeout', items = state.places.filter(x=>x.type===type);
@@ -115,15 +117,20 @@ function openDishForm(id) {
   const d = state.dishes.find(x=>x.id===id) || {};
   const cats = [...new Set(state.dishes.map(x=>x.category))];
   editorIngredients = [...(d.ingredients || [])];
-  modal(d.id?'编辑菜品':'录入新菜', `<form id="dish-form"><div class="form-grid">${field('菜品名称','name',d.name,{required:true})}<div class="field"><label for="category">所属分类 *</label><input id="category" name="category" value="${esc(d.category||'') }" list="categories" required><datalist id="categories">${cats.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>${field('菜谱文字或链接','recipe',d.recipe,{type:'textarea',full:true,required:true,placeholder:'写下做法，或粘贴小红书/下厨房链接'})}<div class="field full"><label for="ingredient-input">所需食材 *</label><div class="term-composer"><input id="ingredient-input" list="terms" placeholder="输入或选择食材"><button type="button" class="btn btn-secondary" data-action="add-ingredient">${icon('plus',17)} 加入</button></div><div class="ingredient-chips" aria-live="polite">${ingredientChips()}</div><input type="hidden" name="ingredients" value="${esc(editorIngredients.join('|'))}" required><span class="hint">新食材首次加入后会自动收入全局词条库。</span><datalist id="terms">${termOptions()}</datalist></div></div><input type="hidden" name="id" value="${esc(d.id||'')}"></form>`, `${d.id?`<button class="btn btn-danger" data-action="delete-dish" data-id="${d.id}">删除</button>`:''}<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-dish">保存菜品</button>`);
+  modal(d.id?'编辑菜品':'录入新菜', `<form id="dish-form"><div class="form-grid">${field('菜品名称','name',d.name,{required:true})}<div class="field"><label for="category">所属分类 *</label><input id="category" name="category" value="${esc(d.category||'') }" list="categories" required><datalist id="categories">${cats.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>${field('菜谱文字或链接','recipe',d.recipe,{type:'textarea',full:true,placeholder:'可选：写下做法，或粘贴小红书/下厨房链接'})}<div class="field full"><label for="ingredient-input">所需食材 *</label><div class="term-composer"><div class="term-input-wrap"><input id="ingredient-input" list="terms" placeholder="输入新食材，或点右侧箭头选择"><button type="button" class="term-arrow" data-action="toggle-ingredient-menu" aria-label="展开食材下拉菜单" aria-expanded="false">${icon('down',18)}</button></div><button type="button" class="btn btn-secondary" data-action="add-ingredient">${icon('plus',17)} 加入</button><div class="term-menu hidden" role="listbox" aria-label="食材下拉菜单">${ingredientMenu()}</div></div><div class="ingredient-chips" aria-live="polite">${ingredientChips()}</div><input type="hidden" name="ingredients" value="${esc(editorIngredients.join('|'))}" required><span class="hint">手动输入后点“加入”；从下拉菜单点选会直接加入清单。</span><datalist id="terms">${termOptions()}</datalist></div></div><input type="hidden" name="id" value="${esc(d.id||'')}"></form>`, `${d.id?`<button class="btn btn-danger" data-action="delete-dish" data-id="${d.id}">删除</button>`:''}<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-dish">保存菜品</button>`);
 }
 function termOptions() { return state.terms.map(x=>`<option value="${esc(x)}">`).join(''); }
+function ingredientMenu() {
+  const terms = state.terms.filter(Boolean).slice().sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'));
+  return terms.length ? terms.map(name=>`<button type="button" role="option" data-action="pick-ingredient" data-name="${esc(name)}">${esc(name)}</button>`).join('') : '<span class="hint">暂无可选食材</span>';
+}
 function ingredientChips() { return editorIngredients.map((name,index)=>`<span class="ingredient-chip">${esc(name)}<button type="button" data-action="remove-ingredient" data-index="${index}" aria-label="移除 ${esc(name)}">${icon('close',13)}</button></span>`).join('') || '<span class="hint">还没有添加食材</span>'; }
 function refreshIngredientEditor() {
   const form = document.querySelector('#dish-form'); if(!form) return;
   form.querySelector('.ingredient-chips').innerHTML = ingredientChips();
   form.elements.ingredients.value = editorIngredients.join('|');
   form.querySelector('#terms').innerHTML = termOptions();
+  form.querySelector('.term-menu').innerHTML = ingredientMenu();
 }
 function openPlaceForm(id) {
   const p = state.places.find(x=>x.id===id) || {type:route==='takeout'?'takeout':'out',rating:5};
@@ -135,7 +142,8 @@ function openInventoryForm(id) {
 }
 function openRecipe(id) {
   const d = state.dishes.find(x=>x.id===id); if(!d) return;
-  modal(d.name, `<div class="share-card"><span class="eyebrow">${esc(d.category)}</span><h2>${esc(d.name)}</h2><div class="tag-row">${d.ingredients.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><h3>菜谱</h3><p>${isUrl(d.recipe)?`这是一个外部菜谱链接。复制后前往对应 App 打开查看：<br><a href="${esc(d.recipe)}" target="_blank" rel="noopener">${esc(d.recipe)}</a>`:esc(d.recipe)}</p></div>`, `${isUrl(d.recipe)?`<button class="btn btn-secondary" data-copy="${esc(d.recipe)}">${icon('copy',17)} 复制链接</button>`:''}<button class="btn btn-primary" data-action="close-modal">知道了</button>`);
+  const recipe = d.recipe?.trim();
+  modal(d.name, `<div class="share-card"><span class="eyebrow">${esc(d.category)}</span><h2>${esc(d.name)}</h2><div class="tag-row">${d.ingredients.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><h3>菜谱</h3><p>${recipe ? (isUrl(recipe)?`这是一个外部菜谱链接。复制后前往对应 App 打开查看：<br><a href="${esc(recipe)}" target="_blank" rel="noopener">${esc(recipe)}</a>`:esc(recipe)) : '这道菜还没有填写菜谱，之后可以再补。'}</p></div>`, `${isUrl(recipe)?`<button class="btn btn-secondary" data-copy="${esc(recipe)}">${icon('copy',17)} 复制链接</button>`:''}<button class="btn btn-primary" data-action="close-modal">知道了</button>`);
 }
 
 function pickDishes() {
@@ -155,17 +163,122 @@ function confirmMenu() {
   const stock = new Set(state.inventory.map(x=>x.name));
   const ingredients = [...new Set(randomSelection.flatMap(x=>x.ingredients))];
   const missing = ingredients.filter(x=>!stock.has(x));
+  lastConfirmedMenu = { dishes: randomSelection.map(x=>({...x})), ingredients, note };
   closeModal();
-  modal('菜单已确认', `<article class="share-card" id="share-card"><span class="eyebrow">今天吃点啥 · 家庭菜单</span><h2>今晚开饭啦</h2><h3>菜单</h3><ul>${randomSelection.map(x=>`<li>${esc(x.name)} · ${esc(x.category)}</li>`).join('')}</ul><h3>食材清单</h3><ul>${ingredients.map(x=>`<li>${esc(x)} — <strong class="${stock.has(x)?'stock-ok':'stock-missing'}">${stock.has(x)?'冰箱有':'需要采购'}</strong></li>`).join('')}</ul><h3>备注</h3><p>${esc(note)}</p></article>`, `${missing.length?`<button class="btn btn-secondary" data-add-missing="${esc(missing.join('|'))}">${icon('cart',17)} 缺的加入采购</button>`:''}<button class="btn btn-secondary" data-action="export-menu">导出 HTML</button><button class="btn btn-primary" data-action="share-menu">${icon('share',17)} 分享</button>`, true);
+  modal('菜单已确认', `<article class="share-card" id="share-card"><span class="eyebrow">今天吃点啥 · 家庭菜单</span><h2>今晚开饭啦</h2><h3>菜单</h3><ul>${randomSelection.map(x=>`<li>${esc(x.name)} · ${esc(x.category)}</li>`).join('')}</ul><h3>食材清单</h3><ul>${ingredients.map(x=>`<li>${esc(x)} — <strong class="${stock.has(x)?'stock-ok':'stock-missing'}">${stock.has(x)?'冰箱有':'需要采购'}</strong></li>`).join('')}</ul><h3>备注</h3><p>${esc(note)}</p></article>`, `${missing.length?`<button class="btn btn-secondary" data-add-missing="${esc(missing.join('|'))}">${icon('cart',17)} 缺的加入采购</button>`:''}<button class="btn btn-primary" data-action="share-menu-image">${icon('share',17)} 生成图片分享</button>`, true);
 }
 
+function wrapCanvasText(ctx, text, maxWidth) {
+  const chars = String(text || '').split('');
+  const lines = []; let line = '';
+  chars.forEach(ch => {
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = ch; }
+    else line = test;
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+async function createShareImageData({ eyebrow, title, sections }) {
+  const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+  const width = 900, pad = 58, max = width - pad * 2;
+  ctx.font = '26px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  let height = 260;
+  sections.forEach(section => {
+    height += 64;
+    section.items.forEach(item => height += Math.max(44, wrapCanvasText(ctx, item, max - 28).length * 34 + 12));
+  });
+  height += 76;
+  canvas.width = width; canvas.height = height;
+  ctx.fillStyle = '#fff9ef'; ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#ffe7dc'; roundRect(ctx, 28, 28, width-56, height-56, 36); ctx.fill();
+  ctx.fillStyle = '#fffefb'; roundRect(ctx, 48, 48, width-96, height-96, 30); ctx.fill();
+  ctx.strokeStyle = '#2d2926'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.fillStyle = '#ef6a4c'; roundRect(ctx, pad, 72, 250, 38, 19); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '700 20px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText(eyebrow, pad + 18, 98);
+  ctx.fillStyle = '#2d2926'; ctx.font = '900 54px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText(title, pad, 166);
+  ctx.fillStyle = '#716a63'; ctx.font = '24px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText('把今晚吃什么，一张图发给家人。', pad, 210);
+  let y = 276;
+  sections.forEach((section, sectionIndex) => {
+    ctx.fillStyle = sectionIndex % 2 ? '#eaf7ef' : '#fff3c8';
+    roundRect(ctx, pad, y - 38, max, 46, 18); ctx.fill();
+    ctx.fillStyle = '#2d2926'; ctx.font = '900 26px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText(section.title, pad + 18, y - 8);
+    y += 26;
+    ctx.font = '24px "Microsoft YaHei UI", "PingFang SC", sans-serif';
+    section.items.forEach(item => {
+      const lines = wrapCanvasText(ctx, item, max - 44);
+      const boxH = Math.max(46, lines.length * 34 + 14);
+      ctx.fillStyle = '#ffffff'; roundRect(ctx, pad, y, max, boxH, 18); ctx.fill();
+      ctx.fillStyle = '#ef6a4c'; ctx.beginPath(); ctx.arc(pad + 24, y + 24, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2d2926';
+      lines.forEach((line, i) => ctx.fillText(line, pad + 44, y + 32 + i * 34));
+      y += boxH + 12;
+    });
+    y += 18;
+  });
+  ctx.fillStyle = '#716a63'; ctx.font = '20px "Microsoft YaHei UI", "PingFang SC", sans-serif'; ctx.fillText('今天吃点啥 · 家庭菜单助手', pad, height - 58);
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', .96));
+  return { blob, dataUrl: canvas.toDataURL('image/png') };
+}
+async function shareImageCard(config, filename) {
+  latestShareImage = await createShareImageData(config);
+  const file = new File([latestShareImage.blob], filename, { type: 'image/png' });
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    try { await navigator.share({ title: config.title, files: [file] }); toast('图片已调起系统分享'); return; }
+    catch(e) { if (e.name === 'AbortError') return; }
+  }
+  closeModal();
+  modal('图片已生成', `<div class="image-preview"><img src="${latestShareImage.dataUrl}" alt="${esc(config.title)}分享图片"><p class="hint">长按或下载图片后，可直接转发到微信。</p></div>`, `<button class="btn btn-secondary" data-action="download-share-image">${icon('copy',17)} 下载图片</button><button class="btn btn-primary" data-action="close-modal">完成</button>`, true);
+}
+async function shareMenuImage() {
+  const menu = lastConfirmedMenu || { dishes: randomSelection, ingredients:[...new Set(randomSelection.flatMap(x=>x.ingredients))], note:'无特殊备注' };
+  const stock = new Set(state.inventory.map(x=>x.name));
+  await shareImageCard({
+    eyebrow: '今天吃点啥',
+    title: '今晚开饭啦',
+    sections: [
+      { title: '菜单', items: menu.dishes.map(x=>`${x.name} · ${x.category}`) },
+      { title: '食材清单', items: menu.ingredients.map(x=>`${x} — ${stock.has(x)?'冰箱有':'需要采购'}`) },
+      { title: '备注', items: [menu.note || '无特殊备注'] }
+    ]
+  }, '今晚菜单.png');
+}
+async function sharePlaceImage(p) {
+  if(!p) return;
+  await shareImageCard({
+    eyebrow: p.type === 'takeout' ? '外卖推荐' : '餐馆推荐',
+    title: p.name,
+    sections: [
+      { title: '分类与评分', items: [`${p.category} · ${Number(p.rating).toFixed(1)} 星`] },
+      { title: p.type === 'takeout' ? '配送信息' : '地址', items: [p.address] },
+      { title: '招牌', items: [p.specials || '待补充'] }
+    ]
+  }, `${p.name}.png`);
+}
 async function shareText(title, text) {
   if(navigator.share) { try { await navigator.share({title,text}); return; } catch(e) { if(e.name==='AbortError') return; } }
   await navigator.clipboard.writeText(text); toast('内容已复制，可粘贴到微信');
 }
-function exportMenu() {
-  const html = `<!doctype html><meta charset="utf-8"><title>家庭菜单</title><style>body{font-family:system-ui;background:#fff9ef;padding:40px;color:#2d2926}.card{max-width:620px;margin:auto;background:white;border:2px solid #2d2926;border-radius:24px;padding:32px}li{line-height:2}</style><div class="card">${document.querySelector('#share-card').innerHTML}</div>`;
-  const a = document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='今晚菜单.html'; a.click(); URL.revokeObjectURL(a.href); toast('菜单 HTML 已导出');
+function downloadShareImage() {
+  if(!latestShareImage?.dataUrl) return toast('请先生成图片');
+  const a = document.createElement('a');
+  a.href = latestShareImage.dataUrl;
+  a.download = '今天吃点啥.png';
+  a.click();
+}
+function addIngredientName(name) {
+  const value = name?.trim();
+  if(!value) return false;
+  if(!editorIngredients.includes(value)) editorIngredients.push(value);
+  addTerms(state,[value]);
+  persist();
+  refreshIngredientEditor();
+  return true;
 }
 
 document.addEventListener('click', async e => {
@@ -182,20 +295,22 @@ document.addEventListener('click', async e => {
   if(action==='recipe') openRecipe(id);
   if(action==='toggle-dish') { manualSelection=manualSelection.includes(id)?manualSelection.filter(x=>x!==id):[...manualSelection,id]; render(); }
   if(action==='manual-confirm') { randomSelection=manualSelection.map(id=>state.dishes.find(x=>x.id===id)).filter(Boolean); selectionMode='manual'; openMenuResult(); }
-  if(action==='add-ingredient') { const input=document.querySelector('#ingredient-input'); const name=input?.value.trim(); if(!name)return toast('请先输入食材名称'); if(!editorIngredients.includes(name))editorIngredients.push(name); addTerms(state,[name]); persist(); input.value=''; refreshIngredientEditor(); input.focus(); }
+  if(action==='add-ingredient') { const input=document.querySelector('#ingredient-input'); const name=input?.value.trim(); if(!name)return toast('请先输入食材名称'); addIngredientName(name); input.value=''; input.focus(); }
+  if(action==='toggle-ingredient-menu') { const menu=document.querySelector('.term-menu'); const open=menu?.classList.toggle('hidden')===false; el.setAttribute('aria-expanded',String(open)); }
+  if(action==='pick-ingredient') { if(addIngredientName(el.dataset.name)) { document.querySelector('#ingredient-input').value=''; document.querySelector('.term-menu')?.classList.add('hidden'); document.querySelector('[data-action="toggle-ingredient-menu"]')?.setAttribute('aria-expanded','false'); toast('已加入食材清单'); } }
   if(action==='remove-ingredient') { editorIngredients.splice(Number(el.dataset.index),1); refreshIngredientEditor(); }
   if(action==='set-rating') updateStarPicker(Number(el.dataset.rating));
   if(action==='random-dishes') pickDishes();
   if(action==='random-dishes-again') { closeModal(); pickDishes(); }
   if(action==='confirm-menu') confirmMenu();
-  if(action==='export-menu') exportMenu();
-  if(action==='share-menu') shareText('今晚菜单', document.querySelector('#share-card').innerText);
+  if(action==='share-menu-image') shareMenuImage();
+  if(action==='download-share-image') downloadShareImage();
   if(action==='random-place') {
     const cat=document.querySelector('#place-category').value, rating=+document.querySelector('#place-rating').value;
     const pool=state.places.filter(x=>x.type===el.dataset.type&&(!cat||x.category===cat)&&x.rating>=rating); if(!pool.length)return toast('没有符合条件的店');
     const p=pool[Math.floor(Math.random()*pool.length)]; modal('就它了！', `<article class="share-card"><span class="eyebrow">${esc(p.category)}</span><h2>${esc(p.name)}</h2><p>${esc(p.address)}</p><p><strong>招牌：</strong>${esc(p.specials)}</p><div class="stars">${starDisplay(p.rating)}</div></article>`, `<button class="btn btn-secondary" data-action="close-modal">换个条件</button><button class="btn btn-primary" data-action="share-place" data-id="${p.id}">${icon('share',17)} 分享结果</button>`);
   }
-  if(action==='share-place') { const p=state.places.find(x=>x.id===id); shareText(`今天吃 ${p.name}`, `${p.name}\n${p.address}\n招牌：${p.specials}\n评分：${p.rating}`); }
+  if(action==='share-place') { const p=state.places.find(x=>x.id===id); sharePlaceImage(p); }
   if(action==='cleanup') { cleanupMode=true; render(); }
   if(action==='cleanup-cancel') { cleanupMode=false; render(); }
   if(action==='delete-stock') { const ids=[...document.querySelectorAll('[data-stock-select]:checked')].map(x=>x.value); if(!ids.length)return toast('请先选择要清理的食材'); state.inventory=state.inventory.filter(x=>!ids.includes(x.id)); cleanupMode=false; persist(); render(); toast('已清理所选食材'); }
@@ -209,7 +324,7 @@ document.addEventListener('click', async e => {
 
 function formData(id) { const form=document.querySelector(`#${id}`); if(!form.reportValidity()) return null; return Object.fromEntries(new FormData(form)); }
 function saveForm(action) {
-  if(action==='save-dish') { if(!editorIngredients.length)return toast('请至少加入一种食材'); const x=formData('dish-form'); if(!x)return; const ingredients=[...editorIngredients]; const item={id:x.id||uid('d'),name:x.name.trim(),category:x.category.trim(),recipe:x.recipe.trim(),ingredients}; const i=state.dishes.findIndex(d=>d.id===x.id); i<0?state.dishes.push(item):state.dishes.splice(i,1,item); addTerms(state,ingredients); }
+  if(action==='save-dish') { if(!editorIngredients.length)return toast('请至少加入一种食材'); const x=formData('dish-form'); if(!x)return; const ingredients=[...editorIngredients]; const item={id:x.id||uid('d'),name:x.name.trim(),category:x.category.trim(),recipe:(x.recipe||'').trim(),ingredients}; const i=state.dishes.findIndex(d=>d.id===x.id); i<0?state.dishes.push(item):state.dishes.splice(i,1,item); addTerms(state,ingredients); }
   if(action==='save-place') { const x=formData('place-form'); if(!x)return; const item={...x,id:x.id||uid('p'),rating:Math.min(5,Math.max(.5,Math.round(+x.rating*2)/2))}; const i=state.places.findIndex(p=>p.id===x.id); i<0?state.places.push(item):state.places.splice(i,1,item); }
   if(action==='save-inventory') { const x=formData('inventory-form'); if(!x)return; const item={...x,id:x.id||uid('i')}; const i=state.inventory.findIndex(p=>p.id===x.id); i<0?state.inventory.push(item):state.inventory.splice(i,1,item); addTerms(state,[x.name]); }
   if(action==='save-shopping') { const x=formData('shopping-form'); if(!x)return; state.shopping.push({id:uid('s'),name:x.name.trim(),done:false}); addTerms(state,[x.name]); }
