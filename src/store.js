@@ -22,13 +22,19 @@ export const seed = {
   terms:['番茄','鸡蛋','鸡翅','可乐','生抽','西兰花','大蒜','牛腩','土豆','胡萝卜','面条','小葱','牛奶']
 };
 
+export const normalizeState = value => {
+  const state = { ...structuredClone(seed), ...(value || {}) };
+  state.dishes = Array.isArray(state.dishes) ? state.dishes : [];
+  state.places = Array.isArray(state.places) ? state.places : [];
+  state.inventory = Array.isArray(state.inventory) ? state.inventory : [];
+  state.shopping = Array.isArray(state.shopping) ? state.shopping : [];
+  state.terms = Array.isArray(state.terms) ? state.terms : [];
+  state.places = state.places.map(place => ({ ...place, rating: Math.min(5, Math.max(.5, Math.round(Number(place.rating || 5) * 2) / 2)) }));
+  return state;
+};
 export const loadState = () => {
-  try {
-    const state = { ...structuredClone(seed), ...JSON.parse(localStorage.getItem(KEY)) };
-    state.places = state.places.map(place => ({ ...place, rating: Math.min(5, Math.max(.5, Math.round(Number(place.rating || 5) * 2) / 2)) }));
-    return state;
-  }
-  catch { return structuredClone(seed); }
+  try { return normalizeState(JSON.parse(localStorage.getItem(KEY))); }
+  catch { return normalizeState(); }
 };
 export const saveState = state => localStorage.setItem(KEY, JSON.stringify(state));
 export const uid = prefix => `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}`;

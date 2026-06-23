@@ -1,6 +1,7 @@
 import './styles.css';
 import { icon } from './icons.js';
 import { loadState, saveState, uid, addTerms } from './store.js';
+import { loadCloudState, queueCloudSave } from './cloudStore.js';
 
 let state = loadState();
 let route = location.hash.slice(1) || 'home';
@@ -14,7 +15,7 @@ const app = document.querySelector('#app');
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const isUrl = text => /^https?:\/\//i.test(text || '');
 const activeShopping = () => state.shopping.filter(item => !item.done);
-const persist = () => saveState(state);
+const persist = () => { saveState(state); queueCloudSave(state); };
 const toast = message => {
   const el = document.querySelector('#toast'); el.textContent = message; el.classList.add('show');
   clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 2600);
@@ -224,3 +225,13 @@ function updateStarPicker(rating) {
   picker.querySelectorAll('[data-rating]').forEach(button=>button.setAttribute('aria-checked',String(Number(button.dataset.rating)===rating)));
 }
 render();
+loadCloudState(state).then(result => {
+  if (!result.enabled) {
+    if (result.error) toast('云端同步暂不可用，已使用本地数据');
+    return;
+  }
+  state = result.state;
+  saveState(state);
+  render();
+  toast(result.loaded ? '已从云端同步' : '云端同步已开启');
+});
