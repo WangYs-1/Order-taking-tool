@@ -42,7 +42,7 @@ function shell(content) {
   const shopping = activeShopping();
   return `<div class="app-shell">
     <header class="topbar">
-      <button class="brand" data-nav="home" aria-label="返回首页"><span class="brand-mark">${icon('chef',26)}</span><span><strong>今天吃点啥</strong><span>家庭吃饭决策小助手</span></span></button>
+      <button class="brand" data-nav="home" aria-label="返回首页"><span class="brand-mark">${icon('chef',26)}</span><span><strong>随便吃点</strong></span></button>
       <div class="avatar" aria-label="家庭账号">家</div>
     </header>
     ${route==='home' && shopping.length ? `<aside class="ticker" aria-label="待采购提醒"><div class="ticker-label">${icon('cart',18)} 待采购</div><div class="ticker-track"><div class="ticker-content">${[...shopping,...shopping].map(x=>`<span>${esc(x.name)}</span>`).join('')}</div></div><button class="ticker-action" data-nav="fridge">去看看</button></aside>` : ''}
@@ -58,16 +58,16 @@ function bottomNav() {
 
 function homePage() {
   const expiring = state.inventory.filter(x => x.expiry && new Date(x.expiry) - new Date() < 4*86400000).length;
-  return `<section class="hero"><div class="hero-copy"><span class="eyebrow">${icon('sparkle',16)} 今天也要好好吃饭</span><h1>别纠结，<br>好吃的马上来。</h1><p>从家里的菜到附近的小店，把“吃什么”变成一件轻松的小事。</p></div><div class="hero-side"><div class="big-icon">${icon('chef',42)}</div><div><strong>${state.dishes.length} 道家常菜</strong><p>已经收入你家的菜单库，想吃什么直接去菜单里挑。</p></div></div></section>
-  <div class="section-head"><div><h2>今天怎么吃？</h2><p>${expiring ? `有 ${expiring} 样食材快到期了，优先消灭它们吧。` : '选一个方向，马上开饭。'}</p></div></div>
+  return `<section class="hero"><div class="hero-copy"><span class="eyebrow">${icon('sparkle',16)} 吃好喝好</span><h1>动动手指，解决“随便吃”和“都可以”</h1></div><div class="hero-side"><div class="big-icon">${icon('chef',42)}</div><div><strong>${state.dishes.length} 道家常菜</strong><p>已经收入你家的菜单库，想吃什么直接去菜单里挑。</p></div></div></section>
+  <div class="section-head"><div><h2>今天怎么吃？</h2><p>${expiring ? `有 ${expiring} 样食材快到期了，优先消灭它们吧。` : '冰箱好像没菜啦！'}</p></div></div>
   <section class="entry-grid" aria-label="四大核心功能">
-    ${entry('cook','chef','自己做','从家常菜单里搭配一桌','cook')}
-    ${entry('out','store','出去吃','抽一家收藏的小馆子','out')}
-    ${entry('takeout','bike','点外卖','不用出门也能吃点好的','takeout')}
-    ${entry('fridge','fridge','看看冰箱','先把现有食材安排上','fridge')}
+    ${entry('cook','chef','自己做','','cook')}
+    ${entry('out','store','出去吃','','out')}
+    ${entry('takeout','bike','点外卖','','takeout')}
+    ${entry('fridge','fridge','看看冰箱','','fridge')}
   </section>`;
 }
-function entry(routeName, iconName, title, desc, cls) { return `<button class="entry-card ${cls}" data-nav="${routeName}"><span class="bubble">${icon(iconName,28)}</span><span><strong>${title}</strong><span>${desc}</span></span><span class="go">${icon('arrow',20)}</span></button>`; }
+function entry(routeName, iconName, title, desc, cls) { return `<button class="entry-card ${cls}" data-nav="${routeName}"><span class="bubble">${icon(iconName,28)}</span><span><strong>${title}</strong>${desc?`<span>${desc}</span>`:''}</span><span class="go">${icon('arrow',20)}</span></button>`; }
 
 function pageHead(title, actionLabel, action) {
   return `<div class="page-head"><div class="page-title"><button class="back-btn" data-nav="home" aria-label="返回首页">${icon('back')}</button><h1>${title}</h1></div><div class="toolbar">${actionLabel ? `<button class="btn btn-primary" data-action="${action}" aria-label="${actionLabel}">${icon('plus',19)}<span>${actionLabel}</span></button>`:''}</div></div>`;
@@ -77,8 +77,8 @@ function cookPage() {
   const categories = [...new Set(state.dishes.map(x=>x.category))];
   const visibleCategories = cookCategoryFilter ? categories.filter(c=>c===cookCategoryFilter) : categories;
   return `${pageHead('自己做','录入新菜','dish-form')}
-    ${manualSelection.length ? `<section class="selection-bar"><div><strong>已选 ${manualSelection.length} 道菜</strong><p>${manualSelection.map(id=>state.dishes.find(x=>x.id===id)?.name).filter(Boolean).map(esc).join('、')}</p></div><button class="btn btn-primary" data-action="manual-confirm">去下单 ${icon('arrow',18)}</button></section>`:''}
-    <section class="random-panel"><div><strong>随机盲盒点菜</strong><p>按荤素搭配，一键决定今天的菜单。</p></div><div class="random-controls">${categories.map(c=>`<label>${esc(c)} <select data-random-cat="${esc(c)}" aria-label="${esc(c)}数量">${[0,1,2,3,4].map(n=>`<option value="${n}" ${((c==='荤菜'&&n===2)||(c!=='荤菜'&&n===1))?'selected':''}>${n}</option>`).join('')}</select></label>`).join('')}<button class="btn btn-primary" data-action="random-dishes">${icon('dice',19)} 开盲盒</button></div></section>
+    ${manualSelection.length ? `<section class="selection-bar"><div><strong>已选 ${manualSelection.length} 道菜</strong><p>${manualSelection.map(id=>state.dishes.find(x=>x.id===id)?.name).filter(Boolean).map(esc).join('、')}</p></div><button class="btn btn-primary" data-action="manual-confirm">去确认 ${icon('arrow',18)}</button></section>`:''}
+    <section class="random-panel"><div><strong>开盲盒</strong><p>一键选择一桌叫“随便”的菜</p></div><div class="random-controls">${categories.map(c=>`<label>${esc(c)} <select data-random-cat="${esc(c)}" aria-label="${esc(c)}数量">${[0,1,2,3,4].map(n=>`<option value="${n}" ${((c==='荤菜'&&n===2)||(c!=='荤菜'&&n===1))?'selected':''}>${n}</option>`).join('')}</select></label>`).join('')}<button class="btn btn-primary" data-action="random-dishes">${icon('dice',19)} 确认</button></div></section>
     <nav class="category-nav" aria-label="菜品分类"><button class="chip ${cookCategoryFilter===''?'active':''}" data-filter-cat="">全部</button>${categories.map(c=>`<button class="chip ${cookCategoryFilter===c?'active':''}" data-filter-cat="${esc(c)}">${esc(c)}</button>`).join('')}</nav>
     ${visibleCategories.map(cat=>`<section class="dish-section" id="cat-${categories.indexOf(cat)}"><h2>${esc(cat)} <span class="count">${state.dishes.filter(x=>x.category===cat).length} 道</span></h2><div class="card-grid">${state.dishes.filter(x=>x.category===cat).map(dishCard).join('')}</div></section>`).join('') || `<div class="empty">菜单还是空的，先录入一道拿手菜吧。</div>`}`;
 }
@@ -88,9 +88,9 @@ function placesPage(type) {
   const isTakeout = type === 'takeout', items = state.places.filter(x=>x.type===type);
   const cats = [...new Set(items.map(x=>x.category))];
   return `${pageHead(isTakeout?'点外卖':'出去吃',isTakeout?'录入店铺':'录入餐馆','place-form')}
-  <section class="random-panel"><div><strong>${isTakeout?'外卖抽签机':'餐馆抽签机'}</strong><p>设置条件，让运气替你做决定。</p></div><div class="random-controls"><select id="place-category" aria-label="店铺分类"><option value="">全部分类</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select><select id="place-rating" aria-label="最低评分"><option value="0">不限评分</option><option value="4">4 星以上</option><option value="4.5">4.5 星以上</option></select><button class="btn btn-primary" data-action="random-place" data-type="${type}">${icon('dice',19)} 抽一家</button></div></section>
+  <section class="random-panel"><div><strong>抽一发</strong><p>一键选择一家叫“都可以”的店</p></div><div class="random-controls"><select id="place-category" aria-label="店铺分类"><option value="">全部分类</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select><select id="place-rating" aria-label="最低评分"><option value="0">不限评分</option><option value="4">4 星以上</option><option value="4.5">4.5 星以上</option></select><button class="btn btn-primary" data-action="random-place" data-type="${type}">${icon('dice',19)} 开抽</button></div></section>
   <div class="section-head"><div><h2>${isTakeout?'常点店铺':'收藏菜馆'}</h2><p>共 ${items.length} 家，吃过以后记得回来打分。</p></div></div>
-  <section class="card-grid">${items.map(placeCard).join('') || `<div class="empty">还没有收藏，录入第一家吧。</div>`}</section>`;
+  <section class="card-grid">${items.map(placeCard).join('') || `<div class="empty">暂时还没有记录，先添加一家吧。</div>`}</section>`;
 }
 function starDisplay(value) {
   const rating = Number(value);
@@ -107,9 +107,9 @@ function fridgePage() {
   const termCount = state.terms.filter(Boolean).length;
   return `${pageHead('冰箱库存')}
   <section class="inventory-summary"><div><strong>冰箱里有 ${state.inventory.length} 样食材</strong><p>${activeShopping().length ? `还有 ${activeShopping().length} 样东西待采购。`:'采购清单已经清空。'}</p></div><div class="toolbar">${cleanupMode?`<button class="btn btn-danger" data-action="delete-stock">${icon('trash',18)} 删除所选</button><button class="btn btn-secondary" data-action="cleanup-cancel">取消</button>`:`<button class="btn btn-secondary" data-action="cleanup">${icon('trash',18)} 清理冰箱</button>`}</div></section>
-  <div class="inventory-grid"><section class="panel"><div class="section-head"><div><h2>现有存货</h2><p>按到期时间优先安排</p></div><button class="icon-btn" data-action="inventory-form" aria-label="录入食材">${icon('plus')}</button></div><div class="inventory-list">${state.inventory.sort((a,b)=>(a.expiry||'9').localeCompare(b.expiry||'9')).map(x=>`<article class="inventory-item">${cleanupMode?`<input type="checkbox" data-stock-select value="${x.id}" aria-label="选择 ${esc(x.name)}">`:''}<span class="food-dot">${esc(x.name.slice(0,1))}</span><span class="inventory-meta"><strong>${esc(x.name)} · ${esc(x.amount)}</strong><small>入库：${esc(x.added||'/')}</small><small>到期：${esc(x.expiry||'/')}</small></span><button class="icon-btn" data-action="inventory-form" data-id="${x.id}" aria-label="编辑 ${esc(x.name)}">${icon('edit',17)}</button></article>`).join('') || `<div class="empty">冰箱空空的。</div>`}</div></section>
-  <section class="panel"><div class="section-head"><div><h2>待补充清单</h2><p>同步显示在首页提醒</p></div><button class="icon-btn" data-action="shopping-form" aria-label="添加待采购食材">${icon('plus')}</button></div><div class="inventory-list">${state.shopping.map(x=>`<article class="inventory-item shopping-item ${x.done?'done':''}"><button class="icon-btn" data-action="toggle-shopping" data-id="${x.id}" aria-label="${x.done?'恢复':'标记已采购'} ${esc(x.name)}">${icon(x.done?'check':'cart',18)}</button><span class="inventory-meta"><strong>${esc(x.name)}</strong><small>${x.done?'已采购':'等待采购'}</small></span><button class="icon-btn" data-action="delete-shopping" data-id="${x.id}" aria-label="删除 ${esc(x.name)}">${icon('trash',17)}</button></article>`).join('') || `<div class="empty">没有待采购食材。</div>`}</div></section></div>
-  <section class="panel terms-entry"><div><h2>食材词条管理</h2><p>管理下拉候选词条，清理不再使用的食材名称。</p></div><div class="terms-entry-actions"><span class="count">${termCount} 条</span><button class="btn btn-secondary" data-nav="terms">${icon('edit',17)} 去管理</button></div></section><datalist id="terms">${state.terms.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
+  <div class="inventory-grid"><section class="panel"><div class="section-head"><div><h2>现有存货</h2><p>优先显示快到期食材</p></div><button class="icon-btn" data-action="inventory-form" aria-label="录入食材">${icon('plus')}</button></div><div class="inventory-list">${state.inventory.sort((a,b)=>(a.expiry||'9').localeCompare(b.expiry||'9')).map(x=>`<article class="inventory-item">${cleanupMode?`<input type="checkbox" data-stock-select value="${x.id}" aria-label="选择 ${esc(x.name)}">`:''}<span class="food-dot">${esc(x.name.slice(0,1))}</span><span class="inventory-meta"><strong>${esc(x.name)} · ${esc(x.amount)}</strong><small>入库：${esc(x.added||'/')}</small><small>到期：${esc(x.expiry||'/')}</small></span><button class="icon-btn" data-action="inventory-form" data-id="${x.id}" aria-label="编辑 ${esc(x.name)}">${icon('edit',17)}</button></article>`).join('') || `<div class="empty">冰箱空空的。</div>`}</div></section>
+  <section class="panel"><div class="section-head"><div><h2>采购清单</h2><p>同步显示在首页提醒</p></div><button class="icon-btn" data-action="shopping-form" aria-label="添加待采购食材">${icon('plus')}</button></div><div class="inventory-list">${state.shopping.map(x=>`<article class="inventory-item shopping-item ${x.done?'done':''}"><button class="icon-btn" data-action="toggle-shopping" data-id="${x.id}" aria-label="${x.done?'恢复':'标记已采购'} ${esc(x.name)}">${icon(x.done?'check':'cart',18)}</button><span class="inventory-meta"><strong>${esc(x.name)}</strong><small>${x.done?'已采购':'等待采购'}</small></span><button class="icon-btn" data-action="delete-shopping" data-id="${x.id}" aria-label="删除 ${esc(x.name)}">${icon('trash',17)}</button></article>`).join('') || `<div class="empty">没有待采购食材。</div>`}</div></section></div>
+  <section class="panel terms-entry"><div><h2>食材词条管理</h2><p>管理下拉候选词条，清理不再使用的食材名称。</p></div><div class="terms-entry-actions"><span class="count">${termCount} 条</span><button class="btn btn-secondary" data-nav="terms">${icon('edit',17)} 管理词条</button></div></section><datalist id="terms">${state.terms.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
 }
 
 function termsPage() {
@@ -138,7 +138,7 @@ function openDishForm(id) {
   const d = state.dishes.find(x=>x.id===id) || {};
   const cats = [...new Set(state.dishes.map(x=>x.category))];
   editorIngredients = [...(d.ingredients || [])];
-  modal(d.id?'编辑菜品':'录入新菜', `<form id="dish-form"><div class="form-grid">${field('菜品名称','name',d.name,{required:true})}<div class="field"><label for="category">所属分类 *</label><input id="category" name="category" value="${esc(d.category||'') }" list="categories" required><datalist id="categories">${cats.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>${field('菜谱文字或链接','recipe',d.recipe,{type:'textarea',full:true,placeholder:'可选：写下做法，或粘贴小红书/下厨房链接'})}<div class="field full"><label for="ingredient-input">所需食材 *</label><div class="term-composer"><div class="term-input-wrap"><input id="ingredient-input" list="terms" placeholder="输入新食材，或点右侧箭头选择"><button type="button" class="term-arrow" data-action="toggle-ingredient-menu" aria-label="展开食材下拉菜单" aria-expanded="false">${icon('down',18)}</button></div><button type="button" class="btn btn-secondary" data-action="add-ingredient">${icon('plus',17)} 加入</button><div class="term-menu hidden" role="listbox" aria-label="食材下拉菜单">${ingredientMenu()}</div></div><div class="ingredient-chips" aria-live="polite">${ingredientChips()}</div><input type="hidden" name="ingredients" value="${esc(editorIngredients.join('|'))}" required><span class="hint">手动输入后点“加入”；从下拉菜单点选会直接加入清单。</span><datalist id="terms">${termOptions()}</datalist></div></div><input type="hidden" name="id" value="${esc(d.id||'')}"></form>`, `${d.id?`<button class="btn btn-danger" data-action="delete-dish" data-id="${d.id}">删除</button>`:''}<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-dish">保存菜品</button>`);
+  modal(d.id?'编辑菜品':'录入新菜', `<form id="dish-form"><div class="form-grid">${field('菜品名称','name',d.name,{required:true})}<div class="field"><label for="category">所属分类 *</label><input id="category" name="category" value="${esc(d.category||'') }" list="categories" required><datalist id="categories">${cats.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>${field('菜谱文字或链接','recipe',d.recipe,{type:'textarea',full:true,placeholder:'可选：写下做法，或填入网站链接'})}<div class="field full"><label for="ingredient-input">所需食材 *</label><div class="term-composer"><div class="term-input-wrap"><input id="ingredient-input" list="terms" placeholder="输入新食材，或点右侧箭头选择"><button type="button" class="term-arrow" data-action="toggle-ingredient-menu" aria-label="展开食材下拉菜单" aria-expanded="false">${icon('down',18)}</button></div><button type="button" class="btn btn-secondary" data-action="add-ingredient">${icon('plus',17)} 添加</button><div class="term-menu hidden" role="listbox" aria-label="食材下拉菜单">${ingredientMenu()}</div></div><div class="ingredient-chips" aria-live="polite">${ingredientChips()}</div><input type="hidden" name="ingredients" value="${esc(editorIngredients.join('|'))}" required><span class="hint">输入后点“添加”，或下拉选择并自动加入清单。</span><datalist id="terms">${termOptions()}</datalist></div></div><input type="hidden" name="id" value="${esc(d.id||'')}"></form>`, `${d.id?`<button class="btn btn-danger" data-action="delete-dish" data-id="${d.id}">删除</button>`:''}<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-dish">保存菜品</button>`);
 }
 function termOptions() { return state.terms.map(x=>`<option value="${esc(x)}">`).join(''); }
 function ingredientMenu() {
@@ -155,7 +155,7 @@ function refreshIngredientEditor() {
 }
 function openPlaceForm(id) {
   const p = state.places.find(x=>x.id===id) || {type:route==='takeout'?'takeout':'out',rating:5};
-  modal(p.id?'编辑信息':(p.type==='takeout'?'录入外卖店铺':'录入餐馆'), `<form id="place-form"><div class="form-grid">${field('名称','name',p.name,{required:true})}${field('分类','category',p.category,{required:true,placeholder:'火锅 / 日料 / 家常菜'})}${field(p.type==='takeout'?'配送信息':'地址','address',p.address,{full:true,required:true})}${field('特色推荐菜','specials',p.specials,{full:true,required:true})}${starPicker(p.rating)}${p.type==='takeout'?field('费用备注','fee',p.fee,{placeholder:'起送 ¥20 / 配送费 ¥3'}):''}</div><input type="hidden" name="id" value="${esc(p.id||'')}"><input type="hidden" name="type" value="${p.type}"></form>`, `${p.id?`<button class="btn btn-danger" data-action="delete-place" data-id="${p.id}">删除</button>`:''}<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-place">保存</button>`);
+  modal(p.id?'编辑信息':(p.type==='takeout'?'录入外卖店铺':'录入餐馆'), `<form id="place-form"><div class="form-grid">${field('名称','name',p.name,{required:true})}${field('分类','category',p.category,{required:true,placeholder:'火锅 / 日料 / 家常菜'})}${field(p.type==='takeout'?'配送信息':'地址','address',p.address,{full:true,required:true})}${field('推荐菜','specials',p.specials,{full:true,required:true})}${starPicker(p.rating)}${p.type==='takeout'?field('费用备注','fee',p.fee,{placeholder:'起送 ¥20 / 配送费 ¥3'}):''}</div><input type="hidden" name="id" value="${esc(p.id||'')}"><input type="hidden" name="type" value="${p.type}"></form>`, `${p.id?`<button class="btn btn-danger" data-action="delete-place" data-id="${p.id}">删除</button>`:''}<button class="btn btn-secondary" data-action="close-modal">取消</button><button class="btn btn-primary" data-action="save-place">保存</button>`);
 }
 function openInventoryForm(id) {
   const item = state.inventory.find(x=>x.id===id) || {};
@@ -177,7 +177,7 @@ function pickDishes() {
 function openMenuResult() {
   const stock = new Set(state.inventory.map(x=>x.name));
   const ingredients = [...new Set(randomSelection.flatMap(x=>x.ingredients))];
-  modal(selectionMode==='manual'?'确认已选菜品':'今晚就吃这些', `<div class="result-list">${randomSelection.map(x=>`<div class="result-dish"><strong>${esc(x.name)}</strong><span class="tag">${esc(x.category)}</span></div>`).join('')}</div><div class="section-head"><div><h2>食材准备</h2><p>已经和冰箱库存自动比对</p></div></div><div class="tag-row">${ingredients.map(x=>`<span class="tag"><span class="${stock.has(x)?'stock-ok':'stock-missing'}">${stock.has(x)?'充足':'缺少'}</span> ${esc(x)}</span>`).join('')}</div><div class="field" style="margin-top:18px"><label for="menu-note">今晚备注</label><textarea id="menu-note" placeholder="比如：少放辣，今晚 8 点吃"></textarea></div>`, `${selectionMode==='random'?`<button class="btn btn-secondary" data-action="random-dishes-again">${icon('dice',17)} 不满意，重随</button>`:''}<button class="btn btn-primary" data-action="confirm-menu">确认菜单</button>`, true);
+  modal(selectionMode==='manual'?'确认已选菜品':'这是你点的“随便”', `<div class="result-list">${randomSelection.map(x=>`<div class="result-dish"><strong>${esc(x.name)}</strong><span class="tag">${esc(x.category)}</span></div>`).join('')}</div><div class="section-head"><div><h2>食材准备</h2><p>已自动和冰箱库存比对</p></div></div><div class="tag-row">${ingredients.map(x=>`<span class="tag"><span class="${stock.has(x)?'stock-ok':'stock-missing'}">${stock.has(x)?'充足':'缺少'}</span> ${esc(x)}</span>`).join('')}</div><div class="field" style="margin-top:18px"><label for="menu-note">备注</label><textarea id="menu-note" placeholder="比如：狗都不吃胡萝卜、不吃香菜"></textarea></div>`, `${selectionMode==='random'?`<button class="btn btn-secondary" data-action="random-dishes-again">${icon('dice',17)} 不满意，重随</button>`:''}<button class="btn btn-primary" data-action="confirm-menu">确认菜单</button>`, true);
 }
 function confirmMenu() {
   const note = document.querySelector('#menu-note')?.value || '无特殊备注';
@@ -186,7 +186,7 @@ function confirmMenu() {
   const missing = ingredients.filter(x=>!stock.has(x));
   lastConfirmedMenu = { dishes: randomSelection.map(x=>({...x})), ingredients, note };
   closeModal();
-  modal('菜单已确认', `<article class="share-card" id="share-card"><span class="eyebrow">今天吃点啥 · 家庭菜单</span><h2>今晚开饭啦</h2><h3>菜单</h3><ul>${randomSelection.map(x=>`<li>${esc(x.name)} · ${esc(x.category)}</li>`).join('')}</ul><h3>食材清单</h3><ul>${ingredients.map(x=>`<li>${esc(x)} — <strong class="${stock.has(x)?'stock-ok':'stock-missing'}">${stock.has(x)?'冰箱有':'需要采购'}</strong></li>`).join('')}</ul><h3>备注</h3><p>${esc(note)}</p></article>`, `${missing.length?`<button class="btn btn-secondary" data-add-missing="${esc(missing.join('|'))}">${icon('cart',17)} 缺的加入采购</button>`:''}<button class="btn btn-primary" data-action="share-menu-image">${icon('share',17)} 生成图片分享</button>`, true);
+  modal('菜单已确认', `<article class="share-card" id="share-card"><span class="eyebrow">随便吃点</span><h2>菜单来啦</h2><h3>菜单</h3><ul>${randomSelection.map(x=>`<li>${esc(x.name)} · ${esc(x.category)}</li>`).join('')}</ul><h3>食材清单</h3><ul>${ingredients.map(x=>`<li>${esc(x)} — <strong class="${stock.has(x)?'stock-ok':'stock-missing'}">${stock.has(x)?'冰箱有':'需要采购'}</strong></li>`).join('')}</ul><h3>备注</h3><p>${esc(note)}</p></article>`, `${missing.length?`<button class="btn btn-secondary" data-add-missing="${esc(missing.join('|'))}">${icon('cart',17)} 缺的加入采购</button>`:''}<button class="btn btn-primary" data-action="share-menu-image">${icon('share',17)} 生成菜单</button>`, true);
 }
 
 function wrapCanvasText(ctx, text, maxWidth) {
@@ -282,7 +282,7 @@ function drawNoteItem(ctx, text, x, y, w) {
   });
   return y + 104;
 }
-async function createShareImageData({ eyebrow, title, subtitle = '把今晚吃什么，一张图发给家人。', sections }) {
+async function createShareImageData({ eyebrow, title, subtitle = '', sections }) {
   const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
   const width = 900, height = 1280, pad = 70, max = width - pad * 2;
   canvas.width = width; canvas.height = height;
@@ -340,7 +340,7 @@ async function createShareImageData({ eyebrow, title, subtitle = '把今晚吃�
   ctx.stroke();
   ctx.fillStyle = '#716a63';
   ctx.font = '20px "Microsoft YaHei UI", "PingFang SC", sans-serif';
-  ctx.fillText('长按保存后可转发到微信 · 今天吃点啥', pad, height - 62);
+  ctx.fillText('长按保存后发给你的饲养员 · 随便吃点', pad, height - 62);
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', .96));
   return { blob, dataUrl: canvas.toDataURL('image/png') };
 }
@@ -351,7 +351,7 @@ async function shareImageCard(config, filename) {
   const wechat = isWechatBrowser();
   const iosWechat = wechat && isIOSBrowser();
   const help = wechat
-    ? `<strong>微信内推荐操作</strong><p>${iosWechat ? '不要从 iOS 分享菜单再点微信。' : ''}请长按上方图片保存到相册，再从微信聊天里发送。</p>`
+    ? `<strong>操作Tips</strong><p>${iosWechat ? '不要从 iOS 分享菜单再点微信。' : ''}请长按图片保存到相册，再到微信聊天里发送。</p>`
     : `<strong>手机分享建议</strong><p>优先点“转发/系统分享”。如果目标 App 不接收图片，请长按图片保存后手动发送。</p>`;
   const footer = wechat
     ? ''
@@ -364,8 +364,8 @@ async function shareMenuImage() {
   const ready = menu.ingredients.filter(x=>stock.has(x));
   const missing = menu.ingredients.filter(x=>!stock.has(x));
   await shareImageCard({
-    eyebrow: '今天吃点啥',
-    title: '今晚开饭啦',
+    eyebrow: '随便吃点',
+    title: '菜单来啦',
     sections: [
       { title: `菜单 · ${menu.dishes.length} 道`, items: menu.dishes.map(x=>`${x.name} · ${x.category}`), limit: 4, color: '#fff0bd' },
       { title: `需要采购 · ${missing.length} 项`, items: missing, style: 'chips', limit: 8, empty: '冰箱都够用', color: '#ffe3d8' },
@@ -389,15 +389,15 @@ async function sharePlaceImage(p) {
 }
 async function shareText(title, text) {
   if(navigator.share) { try { await navigator.share({title,text}); return; } catch(e) { if(e.name==='AbortError') return; } }
-  await navigator.clipboard.writeText(text); toast('内容已复制，可粘贴到微信');
+  await navigator.clipboard.writeText(text); toast('内容已复制');
 }
 async function shareGeneratedImage() {
   if(!latestShareImage?.blob) return toast('请先生成图片');
   if(isWechatBrowser()) return toast('微信内请长按图片选择发送给朋友或保存图片');
-  const file = new File([latestShareImage.blob], latestShareImage.filename || '今天吃点啥.png', { type: 'image/png' });
+  const file = new File([latestShareImage.blob], latestShareImage.filename || '随便吃点.png', { type: 'image/png' });
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ title: latestShareImage.title || '今天吃点啥', files: [file] });
+      await navigator.share({ title: latestShareImage.title || '随便吃点', files: [file] });
       return toast('已调起系统分享');
     } catch(e) {
       if(e.name === 'AbortError') return;
@@ -405,7 +405,7 @@ async function shareGeneratedImage() {
   }
   if (navigator.share) {
     try {
-      await navigator.share({ title: latestShareImage.title || '今天吃点啥', text: '分享图片已生成，请长按保存后转发到微信。' });
+      await navigator.share({ title: latestShareImage.title || '随便吃点', text: '分享图片已生成，请长按保存后转发到微信。' });
       return;
     } catch(e) {
       if(e.name === 'AbortError') return;
@@ -417,7 +417,7 @@ function downloadShareImage() {
   if(!latestShareImage?.dataUrl) return toast('请先生成图片');
   const a = document.createElement('a');
   a.href = latestShareImage.dataUrl;
-  a.download = latestShareImage.filename || '今天吃点啥.png';
+  a.download = latestShareImage.filename || '随便吃点.png';
   a.click();
 }
 function addIngredientName(name) {
@@ -459,7 +459,7 @@ document.addEventListener('click', async e => {
   if(action==='random-place') {
     const cat=document.querySelector('#place-category').value, rating=+document.querySelector('#place-rating').value;
     const pool=state.places.filter(x=>x.type===el.dataset.type&&(!cat||x.category===cat)&&x.rating>=rating); if(!pool.length)return toast('没有符合条件的店');
-    const p=pool[Math.floor(Math.random()*pool.length)]; modal('就它了！', `<article class="share-card"><span class="eyebrow">${esc(p.category)}</span><h2>${esc(p.name)}</h2><p>${esc(p.address)}</p><p><strong>招牌：</strong>${esc(p.specials)}</p><div class="stars">${starDisplay(p.rating)}</div></article>`, `<button class="btn btn-secondary" data-action="close-modal">换个条件</button><button class="btn btn-primary" data-action="share-place" data-id="${p.id}">${icon('share',17)} 分享结果</button>`);
+    const p=pool[Math.floor(Math.random()*pool.length)]; modal('就它了！', `<article class="share-card"><span class="eyebrow">${esc(p.category)}</span><h2>${esc(p.name)}</h2><p>${esc(p.address)}</p><p><strong>招牌：</strong>${esc(p.specials)}</p><div class="stars">${starDisplay(p.rating)}</div></article>`, `<button class="btn btn-secondary" data-action="close-modal">重新抽</button><button class="btn btn-primary" data-action="share-place" data-id="${p.id}">${icon('share',17)} 分享结果</button>`);
   }
   if(action==='share-place') { const p=state.places.find(x=>x.id===id); sharePlaceImage(p); }
   if(action==='cleanup') { cleanupMode=true; render(); }
