@@ -58,7 +58,7 @@ function bottomNav() {
 
 function homePage() {
   const expiring = state.inventory.filter(x => x.expiry && new Date(x.expiry) - new Date() < 4*86400000).length;
-  return `<section class="hero"><div class="hero-copy"><span class="eyebrow">${icon('sparkle',16)} 吃好喝好</span><h1>动动手指，解决<br>“随便”和“都行”</h1></div><div class="hero-side"><div class="big-icon">${icon('chef',42)}</div><div><strong>${state.dishes.length} 道家常菜</strong><p>已经收入你家的菜单库，想吃什么直接去菜单里挑。</p></div></div></section>
+  return `<section class="hero"><div class="hero-copy"><span class="eyebrow">${icon('sparkle',16)} 吃好喝好</span><h1>一键解决<br>“随便”和“都行”</h1></div><div class="hero-side"><div class="big-icon">${icon('chef',42)}</div><div><strong>${state.dishes.length} 道家常菜</strong><p>已经收入你家的菜单库，想吃什么直接去菜单里挑。</p></div></div></section>
   <div class="section-head"><div><h2>今天怎么吃？</h2><p>${expiring ? `有 ${expiring} 样食材快到期了，优先消灭它们吧。` : '冰箱好像没菜啦！'}</p></div></div>
   <section class="entry-grid" aria-label="四大核心功能">
     ${entry('cook','chef','自己做','','cook')}
